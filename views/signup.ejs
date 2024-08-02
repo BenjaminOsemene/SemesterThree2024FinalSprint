@@ -53,13 +53,36 @@
     button:hover {
       background-color: #45a049;
     }
+
+    .alert {
+      padding: 10px;
+      margin-bottom: 15px;
+      border-radius: 4px;
+      color: white;
+    }
+
+    .alert-success {
+      background-color: #4CAF50;
+    }
+
+    .alert-danger {
+      background-color: #f44336;
+    }
   </style>
 </head>
 <body>
   <h1>SignUp</h1>
-  <form action="/signup" method="POST">
-    <input type="text" name="username" placeholder="Username" required>
+  <% if (typeof success_msg != 'undefined') { %>
+    <div class="alert alert-success"><%= success_msg %></div>
+  <% } %>
+  <% if (typeof error_msg != 'undefined') { %>
+    <div class="alert alert-danger"><%= error_msg %></div>
+  <% } %>
+  <form action="/users/register" method="POST">
+    <input type="text" name="name" placeholder="Name" required>
+    <input type="email" name="email" placeholder="Email" required>
     <input type="password" name="password" placeholder="Password" required>
+    <input type="password" name="password2" placeholder="Confirm Password" required>
     <button type="submit">SignUp</button>
   </form>
 </body>
