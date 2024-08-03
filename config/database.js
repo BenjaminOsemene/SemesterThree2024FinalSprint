@@ -28,8 +28,14 @@ let mongoConnection;
 
 async function connectMongo() {
     if (!mongoConnection) {
-        await mongoClient.connect();
-        mongoConnection = mongoClient.db();
+        try {
+            await mongoClient.connect();
+            mongoConnection = mongoClient.db();
+            console.log('Connected to MongoDB');
+        } catch (error) {
+            console.error('Could not connect to MongoDB:', error);
+            throw error;
+        }
     }
     return mongoConnection;
 }
@@ -41,10 +47,21 @@ module.exports = {
 
     // MongoDB functions
     getMongo: connectMongo,
-    
+
     // Close connections
     closeConnections: async () => {
-        await pgPool.end();
-        await mongoClient.close();
+        try {
+            await pgPool.end();
+            console.log('PostgreSQL connection closed');
+        } catch (error) {
+            console.error('Error closing PostgreSQL connection:', error);
+        }
+
+        try {
+            await mongoClient.close();
+            console.log('MongoDB connection closed');
+        } catch (error) {
+            console.error('Error closing MongoDB connection:', error);
+        }
     }
 };
