@@ -7,8 +7,8 @@ const rateLimit = require('express-rate-limit');
 
 // Rate limiting
 const loginLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 5 // limit each IP to 5 requests per windowMs
+  windowMs: 15 * 60 * 1000,
+  max: 5
 });
 
 // Login routes
@@ -17,6 +17,7 @@ router.get('/login', (req, res) => {
 });
 
 router.post('/login', loginLimiter, (req, res, next) => {
+  console.log('Login attempt:', req.body.email);
   passport.authenticate('local', (err, user, info) => {
     if (err) { 
       console.error('Login error:', err);
@@ -63,7 +64,7 @@ router.post('/signup', [
   }
 
   try {
-    const existingUser = await User.findByEmail(req.body.email);
+    const existingUser = await User.findByEmail(req.body.email.toLowerCase());
     if (existingUser) {
       console.log('Signup failed: Email already in use:', req.body.email);
       return res.status(400).render('signup', { 
@@ -73,7 +74,7 @@ router.post('/signup', [
       });
     }
 
-    const newUser = await User.create(req.body.name, req.body.email, req.body.password);
+    const newUser = await User.create(req.body.name, req.body.email.toLowerCase(), req.body.password);
     console.log('User created successfully:', newUser.email);
     req.flash('success', 'Account created successfully! Please log in.');
     res.redirect('/login');
@@ -101,7 +102,6 @@ router.get('/logout', (req, res, next) => {
 });
 
 module.exports = router;
-
 
 
 
