@@ -1,1 +1,0 @@
-INSERT INTO search_keywords (keyword) VALUES ('action'), ('comedy'), ('sci-fi');

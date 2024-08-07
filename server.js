@@ -1,3 +1,4 @@
+require('dotenv').config();
 const express = require('express');
 const session = require('express-session');
 const mongoose = require('mongoose');
@@ -12,9 +13,14 @@ const authRoutes = require('./routes/auth');
 const searchRoutes = require('./routes/search');
 const db = require('./config/database');
 const initializePassport = require('./config/passport');
-require('dotenv').config();
 
 const app = express();
+
+['SESSION_SECRET', 'MONGO_URI', 'PG_PASSWORD'].forEach(varName => {
+  if (!process.env[varName]) {
+    throw new Error(`${varName} environment variable is not set.`);
+  }
+});
 
 // View engine setup
 app.set('view engine', 'ejs');
@@ -28,10 +34,26 @@ app.use(session({
   secret: process.env.SESSION_SECRET,
   resave: false,
   saveUninitialized: false,
-  cookie: { secure: process.env.NODE_ENV === 'production' }
+  cookie: { 
+    secure: process.env.NODE_ENV === 'production',
+    httpOnly: true,
+    maxAge: 24 * 60 * 60 * 1000 // 24 hours
+  }
 }));
 app.use(flash());
-app.use(helmet());
+app.use(helmet({
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc: ["'self'"],
+      scriptSrc: ["'self'", "'unsafe-inline'"],
+      styleSrc: ["'self'", "'unsafe-inline'"],
+      imgSrc: ["'self'", "data:", "https:"],
+    },
+  },
+  referrerPolicy: {
+    policy: 'strict-origin-when-cross-origin',
+  },
+}));
 app.use(morgan('dev'));
 
 // Passport configuration
@@ -46,17 +68,9 @@ app.use(csrf({ cookie: true }));
 app.use((req, res, next) => {
   res.locals.csrfToken = req.csrfToken();
   res.locals.messages = req.flash();
+  res.locals.user = req.user;
   next();
 });
-
-// Database connections
-db.getMongo()
-  .then(() => console.log('Connected to MongoDB'))
-  .catch(err => console.error('Could not connect to MongoDB:', err));
-
-db.getPgPool().connect()
-  .then(() => console.log('Connected to PostgreSQL'))
-  .catch(err => console.error('Could not connect to PostgreSQL:', err));
 
 // Routes
 app.use('/', authRoutes);
@@ -71,24 +85,52 @@ app.get('/', (req, res) => {
   });
 });
 
+// 404 handler
+app.use((req, res, next) => {
+  res.status(404).render('404', { user: req.user });
+});
+
 // Error handling middleware
 app.use((err, req, res, next) => {
   console.error(err.stack);
   if (err.code === 'EBADCSRFTOKEN') {
     res.status(403).send('Form tampered with');
   } else {
-    res.status(500).send('Something broke!');
+    res.status(500).render('error', { 
+      message: 'Something went wrong!',
+      error: process.env.NODE_ENV === 'development' ? err : {}
+    });
   }
 });
 
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+mongoose.set('debug', true); // Enable Mongoose debugging
+
+// Async function to start the server
+async function startServer() {
+  try {
+    await db.getMongo();
+    console.log('Connected to MongoDB');
+    await db.getPgPool().connect();
+    console.log('Connected to PostgreSQL');
+
+    app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+  } catch (err) {
+    console.error('Failed to connect to databases:', err);
+    process.exit(1);
+  }
+}
+
+// Start the server
+startServer();
 
 // Gracefully close connections on exit
 process.on('SIGINT', async () => {
   await db.closeConnections();
   process.exit(0);
 });
+
+
 
 
 
