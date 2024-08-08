@@ -16,17 +16,31 @@ const initializePassport = require('./config/passport');
 
 const app = express();
 
-['SESSION_SECRET', 'MONGO_URI', 'PG_PASSWORD'].forEach(varName => {
-  if (!process.env[varName]) {
-    throw new Error(`${varName} environment variable is not set.`);
+// Middleware to ensure user is authenticated
+function ensureAuthenticated(req, res, next) {
+  if (req.isAuthenticated()) {
+    return next();
   }
+  res.redirect('/login');
+}
+
+// Define a schema
+const movieSchema = new mongoose.Schema({
+  title: String,
+  director: String,
+  description: String,
+  // Add other fields as necessary
 });
 
-// View engine setup
+// Create a compound text index
+movieSchema.index({ title: 'text', director: 'text', description: 'text' });
+
+// Check if the model already exists
+const Movie = mongoose.models.Movie || mongoose.model('Movie', movieSchema);
+
 app.set('view engine', 'ejs');
 app.set('views', path.join(__dirname, 'views'));
 
-// Middleware
 app.use(express.urlencoded({ extended: true }));
 app.use(express.json());
 app.use(cookieParser());
@@ -37,7 +51,7 @@ app.use(session({
   cookie: { 
     secure: process.env.NODE_ENV === 'production',
     httpOnly: true,
-    maxAge: 24 * 60 * 60 * 1000 // 24 hours
+    maxAge: 24 * 60 * 60 * 1000
   }
 }));
 app.use(flash());
@@ -56,15 +70,12 @@ app.use(helmet({
 }));
 app.use(morgan('dev'));
 
-// Passport configuration
 initializePassport(passport);
 app.use(passport.initialize());
 app.use(passport.session());
 
-// CSRF protection
 app.use(csrf({ cookie: true }));
 
-// CSRF token and messages middleware
 app.use((req, res, next) => {
   res.locals.csrfToken = req.csrfToken();
   res.locals.messages = req.flash();
@@ -72,25 +83,49 @@ app.use((req, res, next) => {
   next();
 });
 
-// Routes
 app.use('/', authRoutes);
 app.use('/search', searchRoutes);
 
+// Place the search endpoint here
+app.get('/search', ensureAuthenticated, async (req, res) => {
+  const { query } = req.query;
+  if (!query) {
+    return res.status(400).json({ error: 'Search query is required' });
+  }
+
+  console.log(`Performing search with query: ${query}`);
+
+  try {
+    const results = await Movie.find(
+      { $text: { $search: query } },
+      { score: { $meta: "textScore" } }
+    ).sort({ score: { $meta: "textScore" } });
+
+    console.log(`Search results: ${results.length} documents found`);
+    if (results.length === 0) {
+      console.log('No documents matched the search criteria.');
+    } else {
+      console.log('Search results:', JSON.stringify(results, null, 2));
+    }
+
+    res.json(results);
+  } catch (err) {
+    console.error('Error during search:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 app.get('/', (req, res) => {
-  console.log('User:', req.user);
-  console.log('Flash messages:', req.flash());
   res.render('home', { 
     user: req.user,
     messages: req.flash()
   });
 });
 
-// 404 handler
 app.use((req, res, next) => {
   res.status(404).render('404', { user: req.user });
 });
 
-// Error handling middleware
 app.use((err, req, res, next) => {
   console.error(err.stack);
   if (err.code === 'EBADCSRFTOKEN') {
@@ -104,31 +139,35 @@ app.use((err, req, res, next) => {
 });
 
 const PORT = process.env.PORT || 3000;
-mongoose.set('debug', true); // Enable Mongoose debugging
+mongoose.set('debug', false); 
 
-// Async function to start the server
 async function startServer() {
   try {
     await db.getMongo();
-    console.log('Connected to MongoDB');
-    await db.getPgPool().connect();
-    console.log('Connected to PostgreSQL');
+    await db.testPgConnection();
 
     app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
   } catch (err) {
-    console.error('Failed to connect to databases:', err);
+    console.error('Failed to connect to databases:', err.message);
     process.exit(1);
   }
 }
 
-// Start the server
 startServer();
 
-// Gracefully close connections on exit
 process.on('SIGINT', async () => {
   await db.closeConnections();
   process.exit(0);
 });
+
+
+
+
+
+
+
+
+
 
 
 
