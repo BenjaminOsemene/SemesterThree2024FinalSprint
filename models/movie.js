@@ -16,7 +16,11 @@ const movieSchema = new mongoose.Schema({
     trim: true
   },
   year: {
-    type: Date
+    type: Number, 
+    validate: {
+      validator: Number.isInteger,
+      message: '{VALUE} is not an integer value'
+    }
   },
   director: {
     type: String,
@@ -24,11 +28,12 @@ const movieSchema = new mongoose.Schema({
   },
   rating: [{
     type: Number,
-    trim: true
+    min: 0, 
+    max: 10
   }]
 });
 
-// Create a text index on the title and description fields for efficient text search
-movieSchema.index({ title: 'text', description: 'text' });
+// Create a text index on the title, description, genre, and director fields for efficient text search
+movieSchema.index({ title: 'text', description: 'text', genre: 'text', director: 'text' });
 
 module.exports = mongoose.model('Movie', movieSchema);
