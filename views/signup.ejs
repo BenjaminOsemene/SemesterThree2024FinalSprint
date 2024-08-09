@@ -20,6 +20,19 @@
       margin-bottom: 20px;
     }
 
+    .flash-message, .error-messages {
+      margin-bottom: 20px;
+      padding: 10px;
+      border-radius: 5px;
+      background-color: #ffeb3b;
+      color: #333;
+    }
+
+    .error-messages {
+      background-color: #f8d7da;
+      color: #721c24;
+    }
+
     form {
       background-color: #fff;
       padding: 20px;
@@ -28,6 +41,13 @@
       display: flex;
       flex-direction: column;
       align-items: center;
+      width: 300px;
+    }
+
+    label {
+      margin-bottom: 5px;
+      font-weight: bold;
+      align-self: flex-start;
     }
 
     input {
@@ -57,10 +77,41 @@
 </head>
 <body>
   <h1>SignUp</h1>
+  <% if (error) { %>
+    <div class="flash-message"><%= error %></div>
+  <% } %>
+  <% if (errors && errors.length > 0) { %>
+    <div class="error-messages">
+      <ul>
+        <% errors.forEach(function(error) { %>
+          <li><%= error.msg %></li>
+        <% }); %>
+      </ul>
+    </div>
+  <% } %>
   <form action="/signup" method="POST">
-    <input type="text" name="username" placeholder="Username" required>
-    <input type="password" name="password" placeholder="Password" required>
+    <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+    <label for="name">Name</label>
+    <input type="text" id="name" name="name" placeholder="Name" required>
+    <label for="email">Email</label>
+    <input type="email" id="email" name="email" placeholder="Email" required>
+    <label for="password">Password</label>
+    <input type="password" id="password" name="password" placeholder="Password" required>
+    <div class="password-requirements">
+      Password must:
+      <ul>
+        <li>Be at least 8 characters long</li>
+        <li>Include at least one lowercase letter</li>
+        <li>Include at least one uppercase letter</li>
+        <li>Include at least one number</li>
+        <li>Include at least one special character</li>
+      </ul>
+    </div>
     <button type="submit">SignUp</button>
   </form>
 </body>
 </html>
+
+
+
+

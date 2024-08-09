@@ -28,6 +28,18 @@
       text-align: center;
       margin-bottom: 20px;
     }
+    .user-info {
+      text-align: center;
+      margin-bottom: 20px;
+      color: #555;
+    }
+    .flash-message {
+      margin-bottom: 20px;
+      padding: 10px;
+      border-radius: 5px;
+      background-color: #ffeb3b;
+      color: #333;
+    }
     form {
       display: flex;
       flex-direction: column;
@@ -56,17 +68,36 @@
     button:hover {
       background-color: #45a049;
     }
+    .logout {
+      text-align: center;
+      margin-top: 20px;
+    }
+    .logout a {
+      color: #4CAF50;
+      text-decoration: none;
+    }
+    .logout a:hover {
+      text-decoration: underline;
+    }
   </style>
 </head>
 <body>
   <div class="container">
     <h1>Search Engine!</h1>
-    <form action="/Search" method="POST">
+    <% if (user) { %>
+      <div class="user-info">Welcome, <%= user.name %>!</div>
+    <% } %>
+    <% if (messages.error) { %>
+      <div class="flash-message"><%= messages.error %></div>
+    <% } %>
+    <form action="/search" method="POST">
+      <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+      
       <label for="query">Search:</label>
       <input type="text" id="query" name="query" placeholder="Enter your search query" required>
       
-      <label for="database">Database:</label>
-      <select id="database" name="Database">
+      <label for="dataSource">Database:</label>
+      <select id="dataSource" name="dataSource">
         <option value="postgres">Postgres</option>
         <option value="mongo">MongoDB</option>
         <option value="both">Both</option>
@@ -74,6 +105,9 @@
       
       <button type="submit">Search!</button>
     </form>
+    <div class="logout">
+      <a href="/logout">Logout</a>
+    </div>
   </div>
 </body>
 </html>
