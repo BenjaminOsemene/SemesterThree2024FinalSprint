@@ -1,6 +1,9 @@
+//import required modules
 const bcrypt = require('bcrypt');
 const { pool } = require('../dbConfig');
 
+//Define various asynchronous methods
+//SQL quries to insert and find a new user, values in the SQL query
 const User = {
   async create(name, email, password) {
     try {
