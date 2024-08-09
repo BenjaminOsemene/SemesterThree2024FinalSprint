@@ -1,7 +1,9 @@
+//import required modules
 const express = require('express');
 const router = express.Router();
 const dbConfig = require('../config/database');
 const Movie = require('../models/movie');
+const logSearch = require('../logger'); 
 
 function ensureAuthenticated(req, res, next) {
   if (req.isAuthenticated()) {
@@ -25,6 +27,10 @@ router.post('/', ensureAuthenticated, async (req, res) => {
   const { query, dataSource } = req.body;
   const sanitizedQuery = sanitizeInput(query);
   let results = [];
+
+  // Log the search query
+  const userId = req.user ? req.user.id : 'unknown';
+  logSearch(userId, sanitizedQuery);
 
   try {
     if (dataSource === 'postgres' || dataSource === 'both') {
@@ -73,7 +79,7 @@ async function searchMongo(query) {
       $or: [
         { title: regexQuery },
         { description: regexQuery },
-        { director: regexQuery } // Include director in the search
+        { director: regexQuery } 
       ]
     }).limit(100).exec();
 
@@ -112,6 +118,8 @@ function handleSearchError(error, req) {
 }
 
 module.exports = router;
+
+
 
 
 

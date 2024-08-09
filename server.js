@@ -1,3 +1,4 @@
+//load environment variable,import modules and create instance of exppress app. 
 require('dotenv').config();
 const express = require('express');
 const session = require('express-session');
@@ -11,8 +12,9 @@ const cookieParser = require('cookie-parser');
 const path = require('path');
 const authRoutes = require('./routes/auth');
 const searchRoutes = require('./routes/search');
-const db = require('./config/database');
+const db = require('./config/database'); 
 const initializePassport = require('./config/passport');
+const logSearch = require('./logger'); 
 
 const app = express();
 
@@ -23,20 +25,6 @@ function ensureAuthenticated(req, res, next) {
   }
   res.redirect('/login');
 }
-
-// Define a schema
-const movieSchema = new mongoose.Schema({
-  title: String,
-  director: String,
-  description: String,
-  // Add other fields as necessary
-});
-
-// Create a compound text index
-movieSchema.index({ title: 'text', director: 'text', description: 'text' });
-
-// Check if the model already exists
-const Movie = mongoose.models.Movie || mongoose.model('Movie', movieSchema);
 
 app.set('view engine', 'ejs');
 app.set('views', path.join(__dirname, 'views'));
@@ -86,32 +74,34 @@ app.use((req, res, next) => {
 app.use('/', authRoutes);
 app.use('/search', searchRoutes);
 
-// Place the search endpoint here
-app.get('/search', ensureAuthenticated, async (req, res) => {
-  const { query } = req.query;
+app.post('/search', ensureAuthenticated, async (req, res) => {
+  console.log('Search request received'); 
+  const { query, dataSource } = req.body;
+  const userId = req.user ? req.user.id : 'unknown';
+
   if (!query) {
     return res.status(400).json({ error: 'Search query is required' });
   }
 
-  console.log(`Performing search with query: ${query}`);
+// Debugging line
+  console.log(`Logging search for user: ${userId}, query: ${query}`); 
+  logSearch(userId, query);
 
-  try {
-    const results = await Movie.find(
-      { $text: { $search: query } },
-      { score: { $meta: "textScore" } }
-    ).sort({ score: { $meta: "textScore" } });
+  if (dataSource === 'postgres') {
+    try {
+      const client = await db.getPgClient(); 
+      const sqlQuery = `SELECT * FROM movies WHERE title ILIKE $1 OR director ILIKE $1 OR description ILIKE $1`;
+      const values = [`%${query}%`];
+      const result = await client.query(sqlQuery, values);
 
-    console.log(`Search results: ${results.length} documents found`);
-    if (results.length === 0) {
-      console.log('No documents matched the search criteria.');
-    } else {
-      console.log('Search results:', JSON.stringify(results, null, 2));
+      console.log(`Search results: ${result.rows.length} documents found`);
+      res.json(result.rows);
+    } catch (err) {
+      console.error('Error during PostgreSQL search:', err.message);
+      res.status(500).json({ error: err.message });
     }
-
-    res.json(results);
-  } catch (err) {
-    console.error('Error during search:', err.message);
-    res.status(500).json({ error: err.message });
+  } else {
+    res.status(400).json({ error: 'Unsupported data source' });
   }
 });
 
@@ -139,7 +129,6 @@ app.use((err, req, res, next) => {
 });
 
 const PORT = process.env.PORT || 3000;
-mongoose.set('debug', false); 
 
 async function startServer() {
   try {
@@ -152,7 +141,7 @@ async function startServer() {
     process.exit(1);
   }
 }
-
+// Starting the server
 startServer();
 
 process.on('SIGINT', async () => {

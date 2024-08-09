@@ -1,6 +1,8 @@
+//import required modules
 const LocalStrategy = require('passport-local').Strategy;
 const User = require('../models/user');
 
+//Defined functions for passport
 function initialize(passport) {
   const authenticateUser = async (email, password, done) => {
     try {
@@ -24,6 +26,8 @@ function initialize(passport) {
     }
   };
 
+//Used localStrategy with passport, serializing and deserializing
+//handled errors
   passport.use(new LocalStrategy({ usernameField: 'email' }, authenticateUser));
 
   passport.serializeUser((user, done) => {
