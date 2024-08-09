@@ -1,3 +1,4 @@
+//Import module and define function to generate a session secret
 const crypto = require('crypto');
 
 function generateSessionSecret() {

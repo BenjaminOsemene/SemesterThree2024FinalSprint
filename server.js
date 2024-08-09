@@ -1,3 +1,4 @@
+//load environment variable,import modules and create instance of exppress app. 
 require('dotenv').config();
 const express = require('express');
 const session = require('express-session');
@@ -11,22 +12,23 @@ const cookieParser = require('cookie-parser');
 const path = require('path');
 const authRoutes = require('./routes/auth');
 const searchRoutes = require('./routes/search');
-const db = require('./config/database');
+const db = require('./config/database'); 
 const initializePassport = require('./config/passport');
+const logSearch = require('./logger'); 
 
 const app = express();
 
-['SESSION_SECRET', 'MONGO_URI', 'PG_PASSWORD'].forEach(varName => {
-  if (!process.env[varName]) {
-    throw new Error(`${varName} environment variable is not set.`);
+// Middleware to ensure user is authenticated
+function ensureAuthenticated(req, res, next) {
+  if (req.isAuthenticated()) {
+    return next();
   }
-});
+  res.redirect('/login');
+}
 
-// View engine setup
 app.set('view engine', 'ejs');
 app.set('views', path.join(__dirname, 'views'));
 
-// Middleware
 app.use(express.urlencoded({ extended: true }));
 app.use(express.json());
 app.use(cookieParser());
@@ -37,7 +39,7 @@ app.use(session({
   cookie: { 
     secure: process.env.NODE_ENV === 'production',
     httpOnly: true,
-    maxAge: 24 * 60 * 60 * 1000 // 24 hours
+    maxAge: 24 * 60 * 60 * 1000
   }
 }));
 app.use(flash());
@@ -56,15 +58,12 @@ app.use(helmet({
 }));
 app.use(morgan('dev'));
 
-// Passport configuration
 initializePassport(passport);
 app.use(passport.initialize());
 app.use(passport.session());
 
-// CSRF protection
 app.use(csrf({ cookie: true }));
 
-// CSRF token and messages middleware
 app.use((req, res, next) => {
   res.locals.csrfToken = req.csrfToken();
   res.locals.messages = req.flash();
@@ -72,25 +71,51 @@ app.use((req, res, next) => {
   next();
 });
 
-// Routes
 app.use('/', authRoutes);
 app.use('/search', searchRoutes);
 
+app.post('/search', ensureAuthenticated, async (req, res) => {
+  console.log('Search request received'); 
+  const { query, dataSource } = req.body;
+  const userId = req.user ? req.user.id : 'unknown';
+
+  if (!query) {
+    return res.status(400).json({ error: 'Search query is required' });
+  }
+
+// Debugging line
+  console.log(`Logging search for user: ${userId}, query: ${query}`); 
+  logSearch(userId, query);
+
+  if (dataSource === 'postgres') {
+    try {
+      const client = await db.getPgClient(); 
+      const sqlQuery = `SELECT * FROM movies WHERE title ILIKE $1 OR director ILIKE $1 OR description ILIKE $1`;
+      const values = [`%${query}%`];
+      const result = await client.query(sqlQuery, values);
+
+      console.log(`Search results: ${result.rows.length} documents found`);
+      res.json(result.rows);
+    } catch (err) {
+      console.error('Error during PostgreSQL search:', err.message);
+      res.status(500).json({ error: err.message });
+    }
+  } else {
+    res.status(400).json({ error: 'Unsupported data source' });
+  }
+});
+
 app.get('/', (req, res) => {
-  console.log('User:', req.user);
-  console.log('Flash messages:', req.flash());
   res.render('home', { 
     user: req.user,
     messages: req.flash()
   });
 });
 
-// 404 handler
 app.use((req, res, next) => {
   res.status(404).render('404', { user: req.user });
 });
 
-// Error handling middleware
 app.use((err, req, res, next) => {
   console.error(err.stack);
   if (err.code === 'EBADCSRFTOKEN') {
@@ -104,31 +129,34 @@ app.use((err, req, res, next) => {
 });
 
 const PORT = process.env.PORT || 3000;
-mongoose.set('debug', true); // Enable Mongoose debugging
 
-// Async function to start the server
 async function startServer() {
   try {
     await db.getMongo();
-    console.log('Connected to MongoDB');
-    await db.getPgPool().connect();
-    console.log('Connected to PostgreSQL');
+    await db.testPgConnection();
 
     app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
   } catch (err) {
-    console.error('Failed to connect to databases:', err);
+    console.error('Failed to connect to databases:', err.message);
     process.exit(1);
   }
 }
-
-// Start the server
+// Starting the server
 startServer();
 
-// Gracefully close connections on exit
 process.on('SIGINT', async () => {
   await db.closeConnections();
   process.exit(0);
 });
+
+
+
+
+
+
+
+
+
 
 
 

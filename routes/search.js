@@ -1,9 +1,10 @@
+//import required modules
 const express = require('express');
 const router = express.Router();
 const dbConfig = require('../config/database');
 const Movie = require('../models/movie');
+const logSearch = require('../logger'); 
 
-// Middleware to check if user is authenticated
 function ensureAuthenticated(req, res, next) {
   if (req.isAuthenticated()) {
     return next();
@@ -12,19 +13,8 @@ function ensureAuthenticated(req, res, next) {
   res.redirect('/login');
 }
 
-// PostgreSQL connection pool
 const pgPool = dbConfig.getPgPool();
 
-// Log PostgreSQL connection parameters for debugging
-console.log('PostgreSQL connection parameters:');
-console.log(JSON.stringify(dbConfig.postgresURI, null, 2));
-
-// Test PostgreSQL connection
-dbConfig.testPgConnection().catch(err => {
-  console.error('Error during PostgreSQL connection test:', err);
-});
-
-// Search page
 router.get('/', ensureAuthenticated, (req, res) => {
   res.render('search', { 
     user: req.user, 
@@ -33,11 +23,14 @@ router.get('/', ensureAuthenticated, (req, res) => {
   });
 });
 
-// Search functionality
 router.post('/', ensureAuthenticated, async (req, res) => {
   const { query, dataSource } = req.body;
   const sanitizedQuery = sanitizeInput(query);
   let results = [];
+
+  // Log the search query
+  const userId = req.user ? req.user.id : 'unknown';
+  logSearch(userId, sanitizedQuery);
 
   try {
     if (dataSource === 'postgres' || dataSource === 'both') {
@@ -47,8 +40,6 @@ router.post('/', ensureAuthenticated, async (req, res) => {
     if (dataSource === 'mongo' || dataSource === 'both') {
       results = results.concat(await searchMongo(sanitizedQuery));
     }
-
-    logSearch(req.user.id, sanitizedQuery, dataSource);
 
     res.render('results', { 
       results, 
@@ -65,16 +56,12 @@ router.post('/', ensureAuthenticated, async (req, res) => {
   }
 });
 
-// Helper Functions
-
 async function searchPostgres(query) {
   try {
-    console.log('Executing PostgreSQL query with:', query);
     const pgResults = await pgPool.query(
-      "SELECT * FROM movies WHERE genre ILIKE $1",  
+      "SELECT * FROM movies WHERE title ILIKE $1 OR genre ILIKE $1",  
       [`%${query}%`]
     );
-    console.log('PostgreSQL query results:', pgResults.rows);
     return pgResults.rows;
   } catch (error) {
     console.error('Error in searchPostgres:', error);
@@ -85,10 +72,17 @@ async function searchPostgres(query) {
 async function searchMongo(query) {
   try {
     console.log('Executing MongoDB query with:', query);
+    
+    const regexQuery = new RegExp(query, 'i'); // 'i' for case-insensitive
+
     const mongoResults = await Movie.find({
-      title: { $regex: new RegExp(query, 'i') }
+      $or: [
+        { title: regexQuery },
+        { description: regexQuery },
+        { director: regexQuery } 
+      ]
     }).limit(100).exec();
-    console.log('MongoDB query results:', mongoResults);
+
     return mongoResults;
   } catch (error) {
     console.error('Error in searchMongo:', error);
@@ -96,12 +90,21 @@ async function searchMongo(query) {
   }
 }
 
+// GET route for text search using query parameters
+router.get('/search', async (req, res) => {
+  const searchTerm = req.query.q; // Get the search term from the query parameter
+
+  try {
+    const results = await searchMongo(searchTerm);
+    res.json(results); // Send the results as a JSON response
+  } catch (error) {
+    console.error('Error during search:', error);
+    res.status(500).json({ error: 'An error occurred while searching' });
+  }
+});
+
 function sanitizeInput(input) {
   return input.replace(/[^\w\s]/gi, '');
-}
-
-function logSearch(userId, query, dataSource) {
-  console.log(`User ${userId} searched for "${query}" in ${dataSource}`);
 }
 
 function handleSearchError(error, req) {
@@ -115,3 +118,16 @@ function handleSearchError(error, req) {
 }
 
 module.exports = router;
+
+
+
+
+
+
+
+
+
+
+
+
+
