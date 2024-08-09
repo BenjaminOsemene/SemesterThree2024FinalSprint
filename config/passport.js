@@ -1,13 +1,14 @@
+//import required modules
 const LocalStrategy = require('passport-local').Strategy;
 const User = require('../models/user');
 
+//Defined functions for passport
 function initialize(passport) {
   const authenticateUser = async (email, password, done) => {
     try {
-      const user = await User.findByEmail(email);
+      const user = await User.findByEmail(email.toLowerCase());
       if (!user) {
         console.log('Authentication failed: No user with that email');
-        // Use a generic message to prevent email enumeration
         return done(null, false, { message: 'Invalid email or password' });
       }
 
@@ -17,7 +18,6 @@ function initialize(passport) {
         return done(null, user);
       } else {
         console.log('Authentication failed: Incorrect password for user');
-        // Use a generic message to prevent password guessing
         return done(null, false, { message: 'Invalid email or password' });
       }
     } catch (e) {
@@ -26,6 +26,8 @@ function initialize(passport) {
     }
   };
 
+//Used localStrategy with passport, serializing and deserializing
+//handled errors
   passport.use(new LocalStrategy({ usernameField: 'email' }, authenticateUser));
 
   passport.serializeUser((user, done) => {

@@ -1,19 +1,115 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Search Results</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background-color: #f4f4f4;
+      margin: 0;
+      padding: 20px;
+      line-height: 1.6;
+    }
+    h1 {
+      color: #333;
+    }
+    .result {
+      background-color: #fff;
+      padding: 20px;
+      margin-bottom: 20px;
+      border-radius: 5px;
+      box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+    }
+    .result h2 {
+      margin: 0 0 10px 0;
+      color: #4CAF50;
+    }
+    .result p {
+      margin: 5px 0;
+    }
+    .no-results {
+      background-color: #fff;
+      padding: 20px;
+      border-radius: 5px;
+      box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+    }
+    .back-link {
+      display: inline-block;
+      margin-top: 20px;
+      padding: 10px 15px;
+      background-color: #4CAF50;
+      color: white;
+      text-decoration: none;
+      border-radius: 5px;
+    }
+    .back-link:hover {
+      background-color: #45a049;
+    }
+    .error-message {
+      background-color: #ffebee;
+      color: #c62828;
+      padding: 10px;
+      border-radius: 5px;
+      margin-top: 20px;
+    }
+    .info {
+      background-color: #e3f2fd;
+      padding: 10px;
+      border-radius: 5px;
+      margin-bottom: 20px;
+    }
+    .source-tag {
+      font-size: 0.8em;
+      color: #666;
+      font-style: italic;
+    }
+  </style>
 </head>
 <body>
   <h1>Search Results</h1>
-  <% if (results.length > 0) { %>
-    <ul>
-    <% results.forEach(result => { %>
-      <li><%= JSON.stringify(result) %></li>
-    <% }); %>
-    </ul>
+  
+  <div class="info">
+    <p>Query: "<%= query %>"</p>
+    <p>Data source: <%= dataSource %></p>
+  </div>
+  
+  <% if (results.length === 0) { %>
+    <div class="no-results">
+      <p>No results found.</p>
+    </div>
   <% } else { %>
-    <p>No results found.</p>
+    <p>Found <%= results.length %> result(s).</p>
+    <% results.forEach(result => { %>
+      <div class="result">
+        <h2><%= result.title %></h2>
+        <% if (result.director) { %>
+          <p><strong>Director:</strong> <%= result.director %></p>
+        <% } %>
+        <% if (result.year) { %>
+          <p><strong>Year:</strong> <%= result.year %></p>
+        <% } %>
+        <% if (result.rating) { %>
+          <p><strong>Rating:</strong> <%= result.rating %></p>
+        <% } %>
+        <% if (result.description) { %>
+          <p><strong>Description:</strong> <%= result.description %></p>
+        <% } %>
+        <% if (result.genre) { %>
+          <p><strong>Genre:</strong> <%= result.genre %></p>
+        <% } %>
+        <p class="source-tag">Source: <%= result.source %></p>
+      </div>
+    <% }); %>
   <% } %>
-  <a href="/search">New Search</a>
+
+  <a href="/search" class="back-link">Back to Search</a>
+
+  <% if (messages.error) { %>
+    <div class="error-message">
+      <%= messages.error %>
+    </div>
+  <% } %>
 </body>
 </html>

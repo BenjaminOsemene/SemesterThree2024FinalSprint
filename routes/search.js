@@ -1,10 +1,10 @@
+//import required modules
 const express = require('express');
 const router = express.Router();
-const { Pool } = require('pg');
-const mongoose = require('mongoose');
 const dbConfig = require('../config/database');
+const Movie = require('../models/movie');
+const logSearch = require('../logger'); 
 
-// Middleware to check if user is authenticated
 function ensureAuthenticated(req, res, next) {
   if (req.isAuthenticated()) {
     return next();
@@ -13,67 +13,121 @@ function ensureAuthenticated(req, res, next) {
   res.redirect('/login');
 }
 
-// PostgreSQL connection pool
-const pgPool = new Pool(dbConfig.postgresURI);
+const pgPool = dbConfig.getPgPool();
 
-// Search page
 router.get('/', ensureAuthenticated, (req, res) => {
-  res.render('search', { user: req.user, csrfToken: req.csrfToken(), messages: req.flash() });
+  res.render('search', { 
+    user: req.user, 
+    csrfToken: req.csrfToken(), 
+    messages: req.flash() 
+  });
 });
 
-// Search functionality
 router.post('/', ensureAuthenticated, async (req, res) => {
   const { query, dataSource } = req.body;
+  const sanitizedQuery = sanitizeInput(query);
   let results = [];
+
+  // Log the search query
+  const userId = req.user ? req.user.id : 'unknown';
+  logSearch(userId, sanitizedQuery);
 
   try {
     if (dataSource === 'postgres' || dataSource === 'both') {
-      const pgResults = await pgPool.query(
-        'SELECT * FROM movies WHERE title ILIKE $1 OR description ILIKE $1 LIMIT 100',
-        [`%${query}%`]
-      );
-      results = results.concat(pgResults.rows);
+      results = results.concat(await searchPostgres(sanitizedQuery));
     }
 
     if (dataSource === 'mongo' || dataSource === 'both') {
-      const mongoResults = await mongoose.connection.db.collection('movies')
-        .find({ 
-          $or: [
-            { title: { $regex: query, $options: 'i' } },
-            { description: { $regex: query, $options: 'i' } }
-          ]
-        })
-        .limit(100)
-        .toArray();
-      results = results.concat(mongoResults);
+      results = results.concat(await searchMongo(sanitizedQuery));
     }
-
-    // Log the search
-    console.log(`User ${req.user.id} searched for "${query}" in ${dataSource}`);
 
     res.render('results', { 
       results, 
       user: req.user, 
       csrfToken: req.csrfToken(), 
       messages: req.flash(),
-      query: query,
+      query: sanitizedQuery,
       dataSource: dataSource
     });
   } catch (error) {
     console.error('Search error:', error);
-
-    // Specific error handling
-    if (error instanceof mongoose.Error) {
-      req.flash('error', 'An error occurred with the MongoDB query. Please try again.');
-    } else if (error.code === 'ECONNREFUSED') {
-      req.flash('error', 'Database connection was refused. Please check your database connection.');
-    } else {
-      req.flash('error', 'An error occurred while searching. Please try again.');
-    }
-
+    handleSearchError(error, req);
     res.redirect('/search');
   }
 });
 
+async function searchPostgres(query) {
+  try {
+    const pgResults = await pgPool.query(
+      "SELECT * FROM movies WHERE title ILIKE $1 OR genre ILIKE $1",  
+      [`%${query}%`]
+    );
+    return pgResults.rows;
+  } catch (error) {
+    console.error('Error in searchPostgres:', error);
+    throw error;
+  }
+}
+
+async function searchMongo(query) {
+  try {
+    console.log('Executing MongoDB query with:', query);
+    
+    const regexQuery = new RegExp(query, 'i'); // 'i' for case-insensitive
+
+    const mongoResults = await Movie.find({
+      $or: [
+        { title: regexQuery },
+        { description: regexQuery },
+        { director: regexQuery } 
+      ]
+    }).limit(100).exec();
+
+    return mongoResults;
+  } catch (error) {
+    console.error('Error in searchMongo:', error);
+    throw error;
+  }
+}
+
+// GET route for text search using query parameters
+router.get('/search', async (req, res) => {
+  const searchTerm = req.query.q; // Get the search term from the query parameter
+
+  try {
+    const results = await searchMongo(searchTerm);
+    res.json(results); // Send the results as a JSON response
+  } catch (error) {
+    console.error('Error during search:', error);
+    res.status(500).json({ error: 'An error occurred while searching' });
+  }
+});
+
+function sanitizeInput(input) {
+  return input.replace(/[^\w\s]/gi, '');
+}
+
+function handleSearchError(error, req) {
+  if (error.name === 'MongoError') {
+    req.flash('error', 'An error occurred with the MongoDB query. Please try again.');
+  } else if (error.code === 'ECONNREFUSED') {
+    req.flash('error', 'Database connection was refused. Please check your database connection.');
+  } else {
+    req.flash('error', 'An error occurred while searching. Please try again.');
+  }
+}
+
 module.exports = router;
+
+
+
+
+
+
+
+
+
+
+
+
 
