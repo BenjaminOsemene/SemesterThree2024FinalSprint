@@ -37,14 +37,43 @@
     nav a:hover {
       color: #ffeb3b;
     }
+
+    .flash-message {
+      margin-bottom: 20px;
+      padding: 10px;
+      border-radius: 5px;
+      background-color: #ffeb3b;
+      color: #333;
+    }
+
+    @media (max-width: 600px) {
+      nav {
+        flex-direction: column;
+      }
+
+      nav a {
+        margin: 5px 0;
+      }
+    }
   </style>
 </head>
 <body>
+  <% if (messages.success) { %>
+    <div class="flash-message"><%= messages.success %></div>
+  <% } %>
+  <% if (messages.error) { %>
+    <div class="flash-message"><%= messages.error %></div>
+  <% } %>
+
   <h1>Welcome to the Search Engine</h1>
   <nav>
-    <a href="/login">Login</a>
-    <a href="/signup">SignUp</a>
-    <a href="/search">Search</a>
+    <% if (user) { %>
+      <a href="/search">Search</a>
+      <a href="/logout">Logout</a>
+    <% } else { %>
+      <a href="/login">Login</a>
+      <a href="/signup">SignUp</a>
+    <% } %>
   </nav>
 </body>
 </html>
