@@ -1,3 +1,5 @@
+//Defined mongoose schema for movie model
+//Created text index for efficient text search
 const mongoose = require('mongoose');
 
 const movieSchema = new mongoose.Schema({
@@ -33,7 +35,6 @@ const movieSchema = new mongoose.Schema({
   }]
 });
 
-// Create a text index on the title, description, genre, and director fields for efficient text search
 movieSchema.index({ title: 'text', description: 'text', genre: 'text', director: 'text' });
 
 module.exports = mongoose.model('Movie', movieSchema);

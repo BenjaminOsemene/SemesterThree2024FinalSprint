@@ -1,7 +1,7 @@
+//import modules
 require('dotenv').config();
 const { Pool } = require('pg');
 
-// Ensure all required PostgreSQL environment variables are set
 ['PG_USER', 'PG_HOST', 'PG_DATABASE', 'PG_PASSWORD', 'PG_PORT'].forEach(varName => {
     if (!process.env[varName]) {
         throw new Error(`${varName} environment variable is not set.`);

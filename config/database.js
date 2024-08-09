@@ -1,7 +1,10 @@
+//Load environment variable
+//Import required modules
 require('dotenv').config();
 const { Pool } = require('pg');
 const mongoose = require('mongoose');
 
+//Define configuration settings for PostgreSQL and MongoDB connections
 const config = {
   mongoURI: process.env.MONGO_URI || 'mongodb://localhost:27017/movie_search_engine',
   postgresURI: {
@@ -13,6 +16,7 @@ const config = {
   }
 };
 
+//Error handling checks
 ['PG_HOST', 'PG_PORT', 'PG_DATABASE', 'PG_USER', 'PG_PASSWORD', 'MONGO_URI'].forEach(varName => {
   if (!process.env[varName]) {
     throw new Error(`${varName} environment variable is not set.`);
@@ -25,6 +29,7 @@ if (typeof config.postgresURI.password !== 'string') {
 
 const pgPool = new Pool(config.postgresURI);
 
+//Functions to test PostgreSQL and MongoDB connections
 async function testPgConnection() {
   try {
     await pgPool.query('SELECT NOW()');
@@ -44,6 +49,7 @@ async function connectMongo() {
       mongoConnection = mongoose.connection;
       console.log('Connected to MongoDB');
 
+      //Creating text index
       const moviesCollection = mongoConnection.collection('movies');
 
       const indexes = await moviesCollection.indexes();
@@ -87,3 +93,4 @@ module.exports = {
     }
   }
 };
+
