@@ -1,11 +1,12 @@
-CREATE TABLE IF NOT EXISTS public.movies
+CREATE TABLE public.movies
 (
-    movie_id integer NOT NULL DEFAULT nextval('movies_movie_id_seq'::regclass),
-    title character varying(255) COLLATE pg_catalog."default" NOT NULL,
+    movie_id integer NOT NULL DEFAULT nextval('movies_movie_id_seq1'::regclass),
+    title character varying(255) COLLATE pg_catalog."default",
     director character varying(255) COLLATE pg_catalog."default",
     year integer,
-    rating numeric,
+    rating numeric(2,1),
     description text COLLATE pg_catalog."default",
-    CONSTRAINT movies_pkey PRIMARY KEY (movie_id)
+    genre character varying(255) COLLATE pg_catalog."default",
+    CONSTRAINT movies_pkey1 PRIMARY KEY (movie_id)
 );
 
